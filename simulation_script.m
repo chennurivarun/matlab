@@ -1,18 +1,55 @@
 % simulation_script.m
-% This script runs the ACC simulation and plots the results.
+% Enhanced script to run ACC simulations with parameter sweeps and plotting
 
-% Open the Simulink model
-open_system('ACC_Model.slx');
+%% Setup
+modelName = 'ACC_Model';
+open_system(modelName);
 
-% Set simulation time (adjust as necessary)
-set_param('ACC_Model', 'StopTime', '20');
+% Simulation parameters
+simTime = 20; % seconds
+set_param(modelName, 'StopTime', num2str(simTime));
 
-% Run the simulation
-sim('ACC_Model');
+% Define initial speeds to test (m/s)
+initialSpeeds = [15, 20, 25]; % Example speeds
 
-% (Optional) Plot results if your model sends signals to the MATLAB workspace.
-% Example:
-% plot(simout.time, simout.signals.values);
-% xlabel('Time (s)');
-% ylabel('Vehicle Speed');
-% title('ACC System Simulation');
+% Preallocate results storage
+results = struct();
+
+%% Parameter sweep over initial speeds
+for idx = 1:length(initialSpeeds)
+    initSpeed = initialSpeeds(idx);
+    
+    % Set initial speed in the model (assumes variable 'initial_speed' exists)
+    try
+        set_param([modelName '/Vehicle Dynamics'], 'InitialSpeed', num2str(initSpeed));
+    catch
+        % If parameter not found, warn and continue
+        warning('Initial speed parameter not set in model. Please configure manually.');
+    end
+    
+    % Run simulation
+    simOut = sim(modelName, 'StopTime', num2str(simTime));
+    
+    % Store results
+    results(idx).speed = initSpeed;
+    results(idx).simOut = simOut;
+    
+    % Extract signals (assuming 'simout' logged to workspace)
+    try
+        simout = simOut.get('simout');
+        time = simout.time;
+        values = simout.signals.values;
+        
+        % Plot speed profile
+        figure;
+        plot(time, values);
+        xlabel('Time (s)');
+        ylabel('Vehicle Speed (m/s)');
+        title(['ACC Simulation - Initial Speed: ' num2str(initSpeed) ' m/s']);
+        grid on;
+    catch
+        warning('No logged signal ''simout'' found. Please configure signal logging in the model.');
+    end
+end
+
+disp('Simulations completed.');

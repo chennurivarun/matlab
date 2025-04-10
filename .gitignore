@@ -1,0 +1,35 @@
+# Ignore MATLAB backup and autosave files
+*.asv
+*.bak
+*.autosave
+
+# Ignore Simulink cache and generated code
+slprj/
+sfprj/
+*.slxc
+*.slxp
+*.mdl.r2012a
+*.mex*
+
+# Ignore workspace and temporary files
+*.mat
+*.fig
+*.log
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Ignore user-specific settings
+*.m~ 
+*.swp
+*.swo
+
+# Ignore large data files (customize as needed)
+*.csv
+*.dat
+*.out
+
+# Ignore PDFs generated during documentation
+docs/*.pdf
