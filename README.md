@@ -132,34 +132,92 @@ The successful, stable simulation results were achieved using the following key 
 
 The simulation results after PID tuning and incorporating hysteresis demonstrated a stable and effective ACC system.
 
-```markdown
 ![image](https://github.com/user-attachments/assets/5cf9f3e4-3ab8-478b-983e-41ecaf55a4e1)
-<!-- Placeholder for the final simulation results image -->
-<!-- Replace the line below with the actual markdown for your image -->
-![Final Simulation Results](placeholder_for_final_stable_plot.png "ACC Simulation Results after Tuning and Hysteresis")
-<!-- Example: ![Final Simulation Results](acc_results_stable.png "ACC Simulation Results after Tuning and Hysteresis") -->
-Analysis of Final Results:
-Stable Speed Control: The ego vehicle smoothly tracked the target speed, whether it was the set speed or the lead vehicle's speed. Initial oscillations were completely eliminated.
-Smooth Following: The vehicle maintained a safe distance from the lead vehicle without jerky acceleration or braking during steady following.
-Appropriate Response to Lead Vehicle: The system reacted smoothly and appropriately when the lead vehicle decelerated at t=10s and accelerated at t=50s.
-Handled Spoofing Attack: During the sensor spoofing attack (t=25s-40s), the system perceived a much smaller distance (d_sensed). It correctly interpreted this as an unsafe condition and applied smooth, sustained braking, causing the actual distance (d_rel) to increase as a safety measure.
-Stable Recovery: After the attack ended at t=40s, the system smoothly accelerated to close the large gap created during the attack, eventually re-establishing the correct following distance based on the actual sensor readings.
-Hysteresis Benefit: The hysteresis logic prevented potential rapid switching of the target speed when the sensed distance was close to the safe distance threshold (visible around t=42s), contributing to the overall smoothness.
-Importance of Tuning: The process highlighted the critical importance of PID tuning. The initial gains led to extreme instability, while the final tuned gains resulted in stable, desirable performance.
-7. Formal Verification Aspect
-While detailed formal analysis was beyond the scope of the immediate simulation tuning, the project structure included an XML template (Adaptive_Cruise_Control.xml) for representing the system as a hybrid automaton. This model defines:
-Modes: Discrete operating states (Following, Decelerating, EmergencyBraking, AttackedResponse).
-Flows: Differential equations describing continuous variable evolution (v_ego, d_rel) within each mode.
-Invariants: Conditions that must hold true while in a specific mode (e.g., d_rel >= 0, v_ego <= v_max_limit).
-Transitions: Guard conditions that trigger switches between modes.
-Using tools like SpaceEx, this formal model could be analyzed to mathematically prove safety properties, such as collision avoidance (d_rel >= 0) or adherence to speed limits, under specified assumptions about lead vehicle behavior and system parameters.
-8. Conclusion
+
+# Analysis of Final Results
+
+## 1. Stable Speed Control
+- **Observation:**  
+  The ego vehicle smoothly tracked the target speed, whether it was the set speed or the lead vehicle's speed.
+- **Result:**  
+  Initial oscillations were completely eliminated.
+
+## 2. Smooth Following
+- **Observation:**  
+  The vehicle maintained a safe distance from the lead vehicle.
+- **Result:**  
+  There was no jerky acceleration or braking during steady following.
+
+## 3. Appropriate Response to Lead Vehicle
+- **Observation:**  
+  The system reacted smoothly and appropriately when the lead vehicle decelerated at _t = 10s_ and accelerated at _t = 50s_.
+
+## 4. Handled Spoofing Attack
+- **Observation:**  
+  During the sensor spoofing attack (from _t = 25s_ to _t = 40s_), the system perceived a much smaller distance (denoted as `d_sensed`).
+- **Result:**  
+  It correctly interpreted this as an unsafe condition and applied smooth, sustained braking, causing the actual distance (`d_rel`) to increase as a safety measure.
+
+## 5. Stable Recovery
+- **Observation:**  
+  After the attack ended at _t = 40s_, the system smoothly accelerated.
+- **Result:**  
+  The vehicle closed the large gap created during the attack and eventually re-established the correct following distance based on the actual sensor readings.
+
+## 6. Hysteresis Benefit
+- **Observation:**  
+  The hysteresis logic prevented potential rapid switching of the target speed when the sensed distance was close to the safe distance threshold (notably visible around _t = 42s_).
+- **Result:**  
+  This contributed to the overall smoothness of the system.
+
+## 7. Importance of Tuning
+- **Observation:**  
+  PID tuning played a critical role in system performance.
+- **Result:**  
+  - The initial gains led to extreme instability.
+  - The final tuned gains resulted in stable, desirable performance.
+
+---
+
+# 7. Formal Verification Aspect
+
+While detailed formal analysis was beyond the immediate simulation tuning, the project structure included an XML template (`Adaptive_Cruise_Control.xml`) for representing the system as a hybrid automaton. This model defines:
+
+- **Modes:**  
+  Discrete operating states (e.g., Following, Decelerating, EmergencyBraking, AttackedResponse).
+
+- **Flows:**  
+  Differential equations describing continuous variable evolution (such as `v_ego` and `d_rel`) within each mode.
+
+- **Invariants:**  
+  Conditions that must hold true while in a specific mode (e.g., `d_rel >= 0`, `v_ego <= v_max_limit`).
+
+- **Transitions:**  
+  Guard conditions that trigger switches between modes.
+
+**Using Tools:**  
+- Tools like SpaceEx could analyze this formal model to mathematically prove safety properties, such as collision avoidance (`d_rel >= 0`) or adherence to speed limits, under specified assumptions about lead vehicle behavior and system parameters.
+
+---
+
+# 8. Conclusion
+
 This project successfully designed, simulated, and tuned an Adaptive Cruise Control system using MATLAB. The simulation demonstrated:
-Stable PID-based speed control.
-Effective adaptive logic for maintaining safe following distances.
-Appropriate reaction to lead vehicle speed changes.
-A predictable (braking) response to a simulated sensor spoofing attack.
-The critical role of PID tuning and the benefit of hysteresis for achieving smooth, stable performance.
-The project provides a solid foundation for understanding ACC principles and serves as a basis for further exploration into more advanced control strategies, sensor modeling, attack detection/mitigation, and formal verification.
 
+- **Stable PID-based speed control.**
+- **Effective adaptive logic for maintaining safe following distances.**
+- **Appropriate reaction to lead vehicle speed changes.**
+- **A predictable (braking) response to a simulated sensor spoofing attack.**
 
+The project also highlighted:
+
+- **The critical role of PID tuning:**  
+  Fine-tuning was essential for achieving stable, smooth performance.
+- **The benefits of hysteresis:**  
+  Prevented rapid target speed switching, contributing to overall smoothness.
+  
+Overall, the project provides a solid foundation for understanding ACC principles and serves as a basis for further exploration into:
+- More advanced control strategies.
+- Enhanced sensor modeling.
+- Attack detection/mitigation.
+- Formal verification.
