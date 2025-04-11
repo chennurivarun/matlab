@@ -1,73 +1,72 @@
-%% ACC_Model Creation Script
-% This script creates a simple Simulink model for an Adaptive Cruise Control (ACC) system.
-% The model includes blocks for a constant speed setpoint, a sensor reading, error calculation,
-% a PID controller, an integrator for vehicle dynamics, and a scope to visualize the output.
+%% create_ACC_Model.m
+% This script programmatically creates a Simulink model for an Adaptive Cruise Control (ACC) system.
+% The model includes:
+%   - A Constant block for the desired speed (setpoint).
+%   - A Constant block simulating the sensor (vehicle speed measurement).
+%   - A Subtract block to compute the speed error.
+%   - A PID Controller block.
+%   - An Integrator block to simulate vehicle dynamics.
+%   - A Scope block to visualize the vehicle speed output.
 %
-% To use:
-% 1. Copy this entire script into a new MATLAB script file (e.g., create_ACC_Model.m).
-% 2. Run the script in MATLAB. It will create and save the model "ACC_Model.slx" in your current folder.
-% 3. Open the model in Simulink to inspect, run, or further modify.
+% Run this script to create and save ACC_Model.slx.
 
-%% Define the model name and create a new system
 modelName = 'ACC_Model';
-new_system(modelName);          % Create a new, blank model
-open_system(modelName);         % Open it for editing
+new_system(modelName);          % Create a new, blank Simulink model
+open_system(modelName);         % Open the model for editing
 
-%% 1. Add a Constant Block for the Desired Speed (Setpoint)
+%% 1. Add a Constant Block for Desired Speed (Setpoint)
 setpointBlock = [modelName, '/Setpoint'];
 add_block('simulink/Sources/Constant', setpointBlock, ...
-    'Value', '28', ...        % Desired speed (28 m/s as an example)
+    'Value', '28', ...        % Desired speed in m/s
     'Position', [30 30 80 60]);
 
-%% 2. Add a Constant Block for the Sensor Reading (Current Speed)
+%% 2. Add a Constant Block for Sensor Reading (Current Speed)
 sensorBlock = [modelName, '/Sensor'];
 add_block('simulink/Sources/Constant', sensorBlock, ...
-    'Value', '25', ...        % Current speed (25 m/s as an example)
+    'Value', '25', ...        % Actual measured speed in m/s (initial value)
     'Position', [30 100 80 130]);
 
 %% 3. Add a Subtract Block to Compute the Error (Setpoint - Sensor)
 errorBlock = [modelName, '/Error'];
 add_block('simulink/Math Operations/Subtract', errorBlock, ...
-    'Inputs', '++', ...       % Two inputs, both positive (we will assign polarity via connections)
+    'Inputs', '++', ...       % Two positive inputs: first is setpoint and second is sensor reading (error = setpoint - sensor)
     'Position', [150 40 190 90]);
 
-%% 4. Add a PID Controller Block
-% In this example we use a discrete PID Controller. Adjust the parameters as needed.
-pidBlock = [modelName, '/PID'];
+%% 4. Add a Discrete PID Controller Block
+% Using a discrete version so that the controller can be tuned further if needed.
+pidBlock = [modelName, '/PID_Controller'];
 add_block('simulink/Discrete/PID Controller', pidBlock, ...
-    'P', '1', 'I', '0.1', 'D', '0', ...
+    'P', '1', 'I', '0.1', 'D', '0', ...  % Example gain values; adjust as needed.
     'Position', [250 40 320 100]);
 
 %% 5. Add an Integrator Block to Model Vehicle Dynamics
-% This block integrates the control signal (acceleration) to give velocity (speed).
+% This block integrates the acceleration (control signal) into vehicle speed.
 integratorBlock = [modelName, '/Integrator'];
 add_block('simulink/Continuous/Integrator', integratorBlock, ...
-    'InitialCondition', '25', ...  % Starting speed is 25 m/s (matches sensor block)
+    'InitialCondition', '25', ...  % Starting speed (should match sensor initial value)
     'Position', [400 40 450 100]);
 
-%% 6. Add a Scope Block to Display the Vehicle Speed Output
+%% 6. Add a Scope Block to Display Vehicle Speed Output
 scopeBlock = [modelName, '/Scope'];
 add_block('simulink/Sinks/Scope', scopeBlock, ...
     'Position', [500 40 550 100]);
 
 %% 7. Connect the Blocks
-% Connect the Setpoint block to the first input of the Error block.
+% Connect the Setpoint to Error input 1.
 add_line(modelName, 'Setpoint/1', 'Error/1');
 
-% Connect the Sensor block to the second input of the Error block.
+% Connect the Sensor to Error input 2.
 add_line(modelName, 'Sensor/1', 'Error/2');
 
-% Connect the output of the Error block to the input of the PID Controller.
-add_line(modelName, 'Error/1', 'PID/1');
+% Connect Error output to PID Controller input.
+add_line(modelName, 'Error/1', 'PID_Controller/1');
 
-% Connect the output of the PID Controller to the Integrator.
-add_line(modelName, 'PID/1', 'Integrator/1');
+% Connect the PID Controller output to the Integrator input.
+add_line(modelName, 'PID_Controller/1', 'Integrator/1');
 
-% Connect the output of the Integrator to the Scope block.
+% Connect the Integrator output to the Scope block.
 add_line(modelName, 'Integrator/1', 'Scope/1');
 
-%% 8. Save and Close the System
-save_system(modelName, [modelName, '.slx']);  % Save the model as ACC_Model.slx
-% Optionally, close the system if you do not wish to keep it open:
-% close_system(modelName);
+%% 8. Save the Model
+save_system(modelName, [modelName, '.slx']);
 disp(['Simulink model ', modelName, '.slx has been created and saved.']);
