@@ -29,6 +29,10 @@ A = 2.5;            % Vehicle frontal area (m^2)
 rho = 1.2;          % Air density (kg/m^3)
 g = 9.81;           % Acceleration due to gravity (m/s^2)
 
+vehicle_time_constant = 0.5; % Example time constant (seconds) - TUNE THIS
+plant_num = 1;
+plant_den = [vehicle_time_constant 1];
+
 % --- Control & Physical Limits ---
 a_max = 2.0;        % Maximum comfortable/engine acceleration (m/s^2)
 a_min = -5.0;       % Maximum comfortable/braking deceleration (m/s^2) - Must be negative
