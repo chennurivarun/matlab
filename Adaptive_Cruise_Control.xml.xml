@@ -1,53 +1,173 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
-<sspaceex xmlns="http://www-verimag.imag.fr/xml-namespaces/sspaceex" version="0.2" math="SpaceEx">
-  <component id="acc_system">
-    <!-- Global system parameters -->
-    <param name="v" type="real" local="false" d1="1" d2="1" dynamics="any" />
-    <param name="t" type="real" local="true" d1="1" d2="1" dynamics="any" />
-    <param name="d" type="real" local="true" d1="1" d2="1" dynamics="any" />
-    <param name="s" type="real" local="true" d1="1" d2="1" dynamics="any" /> <!-- Sensor reading -->
+<sspaceex xmlns="http://sspaceex.imag.fr/SYNTAX" version="0.2" math="SpaceEx">
 
-    <!-- Locations represent different control modes -->
-    <location id="1" name="Normal" x="100" y="100" width="200" height="100">
-      <invariant>v &gt;= 20 and v &lt;= 30 and d &gt;= 10</invariant>
-      <flow>v' == -0.5*v + control; t' == 1; d' == 0.1; s' == 0</flow>
+  <!-- ====================================================================== -->
+  <!-- Component Definition: ACC System Formal Model                        -->
+  <!-- Tool: Targeted for SpaceEx (Syntax may need adaptation for others)   -->
+  <!-- Description: Models ACC behavior with modes for following,           -->
+  <!--              decelerating, emergency braking, and attack response.   -->
+  <!-- Level of Detail: Simplified dynamics within modes.                   -->
+  <!--                  Control logic abstracted into transitions/flows.    -->
+  <!-- ====================================================================== -->
+  <component id="acc_system_formal_model">
+
+    <!-- Parameters: Defined system constants and external inputs/triggers -->
+    <!-- `local="false"` indicates these are potentially set externally or are constants -->
+    <!-- `dynamics="const"` means the value doesn't change over time -->
+    <!-- `dynamics="any"` means it can change arbitrarily (external input/trigger) -->
+
+    <!-- System Configuration Parameters -->
+    <param name="v_set" type="real" local="false" d1="1" d2="1" dynamics="const" /> <!-- Driver's desired speed -->
+    <param name="T_gap" type="real" local="false" d1="1" d2="1" dynamics="const" /> <!-- Safe time gap parameter -->
+    <param name="d_min" type="real" local="false" d1="1" d2="1" dynamics="const" /> <!-- Minimum distance cushion -->
+    <param name="v_max_limit" type="real" local="false" d1="1" d2="1" dynamics="const" /> <!-- Vehicle's physical maximum speed -->
+    <param name="hyst_delta" type="real" local="false" d1="1" d2="1" dynamics="const" /> <!-- Hysteresis margin for mode switching -->
+
+    <!-- Abstracted Control Actions (Representing average acceleration in modes) -->
+    <param name="a_follow_accel" type="real" local="false" d1="1" d2="1" dynamics="const" /> <!-- Assumed accel when trying to reach v_set -->
+    <param name="a_follow_decel" type="real" local="false" d1="1" d2="1" dynamics="const" /> <!-- Assumed decel if slightly over v_set/v_lead -->
+    <param name="a_decel_normal" type="real" local="false" d1="1" d2="1" dynamics="const" /> <!-- Deceleration when closing gap -->
+    <param name="a_emergency_brake" type="real" local="false" d1="1" d2="1" dynamics="const" /> <!-- Max braking deceleration -->
+    <param name="a_attack_response_decel" type="real" local="false" d1="1" d2="1" dynamics="const" /> <!-- Deceleration applied upon detecting attack -->
+
+    <!-- External Inputs & Triggers -->
+    <param name="v_lead" type="real" local="false" d1="1" d2="1" dynamics="any" /> <!-- Lead vehicle speed (can change) -->
+    <param name="spoofing_detected" type="bool" local="false" d1="1" d2="1" dynamics="any" /> <!-- Boolean trigger: Attack detected -->
+    <param name="attack_cleared" type="bool" local="false" d1="1" d2="1" dynamics="any" /> <!-- Boolean trigger: Attack condition resolved -->
+    <param name="d_rel_sensed" type="real" local="false" d1="1" d2="1" dynamics="any" /> <!-- Sensed distance (can change due to dynamics or spoofing) -->
+                                                                                      <!-- Note: Modeling d_rel_sensed explicitly as input can be complex. -->
+                                                                                      <!-- Often, transitions use the true d_rel assuming spoofing affects -->
+                                                                                      <!-- detection logic (spoofing_detected trigger) rather than guards directly. -->
+
+    <!-- State Variables: Internal system state evolving over time -->
+    <!-- `local="true"` indicates these evolve based on the model's dynamics -->
+    <!-- `dynamics="ode"` indicates evolution is described by differential equations (flows) -->
+    <param name="v_ego" type="real" local="true" d1="1" d2="1" dynamics="ode" /> <!-- Ego vehicle speed -->
+    <param name="d_rel" type="real" local="true" d1="1" d2="1" dynamics="ode" /> <!-- ACTUAL relative distance -->
+    <param name="t_clock" type="real" local="true" d1="1" d2="1" dynamics="ode" /> <!-- Optional: A clock variable -->
+
+
+    <!-- ================== LOCATIONS (System Modes) ================== -->
+
+    <!-- Location 1: Following Mode -->
+    <!-- System aims for v_set while maintaining d_safe > d_min + T_gap*v_ego -->
+    <location id="1" name="Following">
+      <!-- Flow: Continuous dynamics (differential equations) within this mode -->
+      <!-- Describes how state variables change over time while in 'Following' -->
+      <!-- Simplification: Assumes constant acceleration/deceleration towards target -->
+      <flow>
+        v_ego' == a_follow_accel &       <!-- Example: Assume trying to reach v_set -->
+        d_rel' == v_lead - v_ego &
+        t_clock' == 1
+      </flow>
+      <!-- Invariant: Conditions that MUST remain true while in this mode -->
+      <!-- Safety properties are often checked against invariants -->
+      <invariant>
+        d_rel >= d_min + T_gap * v_ego &  <!-- Must maintain safe distance -->
+        v_ego >= 0 &                     <!-- Speed non-negative -->
+        v_ego <= v_max_limit           <!-- Speed below physical max -->
+        /* Additional constraint: v_ego <= v_set ? (Depends on model fidelity) */
+      </invariant>
     </location>
 
-    <location id="2" name="Decelerate" x="350" y="100" width="200" height="100">
-      <invariant>v &gt;= 10 and d &lt; 10</invariant>
-      <flow>v' == -1*v + control; t' == 1; d' == 0.2; s' == 0</flow>
+    <!-- Location 2: Decelerating Mode -->
+    <!-- Activated when d_rel (or d_sensed) drops below d_safe threshold -->
+    <location id="2" name="Decelerating">
+      <flow>
+        v_ego' == a_decel_normal &         <!-- Apply normal deceleration -->
+        d_rel' == v_lead - v_ego &
+        t_clock' == 1
+      </flow>
+      <!-- Invariant: Physical limits apply -->
+      <invariant>
+        v_ego >= 0 &
+        v_ego <= v_max_limit
+      </invariant>
     </location>
 
-    <!-- A mode to capture sensor spoofing events -->
-    <location id="3" name="SensorSpoof" x="200" y="250" width="200" height="100">
-      <invariant>s &gt; d + 5</invariant>
-      <flow>v' == -0.2*v + control; t' == 1; s' == 0</flow>
+    <!-- Location 3: Emergency Braking Mode -->
+    <!-- Activated if distance becomes critically low (e.g., < d_min) -->
+    <location id="3" name="EmergencyBraking">
+       <flow>
+         v_ego' == a_emergency_brake &    <!-- Apply maximum braking -->
+         d_rel' == v_lead - v_ego &
+         t_clock' == 1
+       </flow>
+       <!-- Invariant: Physical limits apply -->
+       <invariant>
+         v_ego >= 0 &
+         v_ego <= v_max_limit &
+         d_rel >= 0                      <!-- Critical safety invariant: No collision -->
+      </invariant>
     </location>
 
-    <!-- Transitions implementing adaptive and recovery behavior -->
+    <!-- Location 4: Attacked Response Mode -->
+    <!-- Activated upon external detection of sensor spoofing -->
+    <location id="4" name="AttackedResponse">
+       <flow>
+         v_ego' == a_attack_response_decel & <!-- Apply predetermined safe deceleration -->
+         d_rel' == v_lead - v_ego &
+         t_clock' == 1
+       </flow>
+       <!-- Invariant: Physical limits apply; stay until cleared -->
+       <invariant>
+         v_ego >= 0 &
+         v_ego <= v_max_limit
+       </invariant>
+    </location>
+
+    <!-- ================== TRANSITIONS (Mode Switching Rules) ================== -->
+    <!-- Transitions define how the system moves between locations -->
+    <!-- `guard`: Condition that must be true for the transition to occur -->
+    <!-- `assignment`: Actions performed instantly upon transition (e.g., reset variables) -->
+
+    <!-- Following -> Decelerating: Distance becomes unsafe -->
     <transition source="1" target="2">
-      <guard>d &lt; 10</guard>
-      <assignment>t := 0</assignment>
+      <guard> d_rel < d_min + T_gap * v_ego </guard>
+      <!-- <assignment> t_clock := 0 </assignment> --> <!-- Example reset -->
     </transition>
+
+    <!-- Decelerating -> Following: Distance restored with hysteresis -->
     <transition source="2" target="1">
-      <guard>d &gt;= 10</guard>
-      <assignment>t := 0</assignment>
+      <guard> d_rel >= d_min + T_gap * v_ego + hyst_delta </guard>
     </transition>
-    <!-- Transition to sensor spoof mode when sensor reading deviates by more than 5 units from d -->
+
+    <!-- Decelerating -> EmergencyBraking: Distance critically low -->
+    <transition source="2" target="3">
+      <guard> d_rel < d_min </guard>
+    </transition>
+
+    <!-- Following -> EmergencyBraking: Sudden critical situation -->
     <transition source="1" target="3">
-      <guard>s &gt; d + 5</guard>
-      <assignment>s := d</assignment>
+      <guard> d_rel < d_min </guard>
     </transition>
+
+    <!-- EmergencyBraking -> Following: Situation resolved with hysteresis -->
     <transition source="3" target="1">
-      <guard>s == d</guard>
-      <assignment>t := 0</assignment>
+       <guard> d_rel >= d_min + T_gap * v_ego + hyst_delta </guard>
     </transition>
-  </component>
-  
-  <component id="system">
-    <param name="v" type="real" local="false" d1="1" d2="1" dynamics="any" controlled="true" />
-    <bind component="acc_system" as="acc1">
-      <map key="v">v</map>
-    </bind>
-  </component>
+
+    <!-- EmergencyBraking -> Decelerating: Less critical but still close -->
+    <transition source="3" target="2">
+       <guard> d_rel >= d_min & d_rel < d_min + T_gap * v_ego </guard>
+    </transition>
+
+    <!-- Transitions TO AttackedResponse Mode (Triggered by external detection) -->
+    <transition source="1" target="4"> <guard> spoofing_detected == 1 </guard> </transition>
+    <transition source="2" target="4"> <guard> spoofing_detected == 1 </guard> </transition>
+    <transition source="3" target="4"> <guard> spoofing_detected == 1 </guard> </transition>
+
+    <!-- Transitions FROM AttackedResponse Mode (Triggered by external clearing) -->
+    <!-- Based on actual distance 'd_rel' AFTER attack clears -->
+    <transition source="4" target="1"> <!-- To Following -->
+      <guard> attack_cleared == 1 & d_rel >= d_min + T_gap * v_ego + hyst_delta </guard>
+    </transition>
+    <transition source="4" target="2"> <!-- To Decelerating -->
+      <guard> attack_cleared == 1 & d_rel >= d_min & d_rel < d_min + T_gap * v_ego + hyst_delta </guard>
+    </transition>
+     <transition source="4" target="3"> <!-- To Emergency Braking (If still critical after clear) -->
+      <guard> attack_cleared == 1 & d_rel < d_min </guard>
+    </transition>
+
+  </component> <!-- End of acc_system_formal_model component -->
 </sspaceex>
