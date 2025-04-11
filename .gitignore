@@ -1,35 +1,98 @@
-# Ignore MATLAB backup and autosave files
+# ==========================================
+# Git Ignore file for MATLAB/Simulink Projects
+# ==========================================
+
+# MATLAB Artifacts
 *.asv
 *.bak
-*.autosave
+*.metadata
+*.mex*
+*.p
+*.pdb
+*.prefetch
+*.stackdump
+*.trace
+callgrind.*
+profile.prof
+matlabprefs.mat
+matlab.prf
+MLHIST*.zip
+syntax_coloring_settings.txt
+toolbox_cache*
 
-# Ignore Simulink cache and generated code
+# Simulink Artifacts & Cache
+*.autosave
+*.bak
+*.blockset_data
+*.slproject.userrevs.gitinfo
+*.slproject.usersettings
+*.slxc
+*.slx.original
+*.slicData.*
 slprj/
 sfprj/
-*.slxc
-*.slxp
-*.mdl.r2012a
-*.mex*
+_Simulink_Cache_/
+*_ert_rtw/
+*_grt_rtw/
+*_slrt_rtw/
+*_stm_rtw/
+*_usr_rtw/
+*.paj
+*.bld
+*.tmw
+*.rtw
+*.rapidMdlRef*
+rapid_accel_target_utils/
+rapid_accel_target_utils.zip
+sl_test_temp_folder/
 
-# Ignore workspace and temporary files
-*.mat
-*.fig
-*.log
+# Generated Code Artifacts (if using code generation)
+*.c
+*.cpp
+*.h
+*.html
+*.info
+*.lib
+*.map
+*.mk
+*.obj
+*.o
+*.pdb
+*.rsp
+*.sdf
+*.suo
+*.vcproj
+*.vcxproj
+*.vcxproj.filters
+*.zip
+code_rtw. Vs/
+*.dll
+*.exe
+*.dylib
+*.so
+*.a
 
-# Ignore OS-specific files
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Ignore user-specific settings
-*.m~ 
-*.swp
-*.swo
-
-# Ignore large data files (customize as needed)
+# Optional: Output files you might generate
 *.csv
-*.dat
-*.out
+*.txt  # Be careful if you have text files you WANT to track (like ACC_Model_Description.txt)
+*.pdf
+*.png
+*.jpg
+*.log
+*.mat # Ignore MAT files unless they contain essential input data
 
-# Ignore PDFs generated during documentation
-docs/*.pdf
+# Operating System Files
+# Mac
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+# Linux
+*~
+
+# IDE specific (e.g., VS Code)
+.vscode/
