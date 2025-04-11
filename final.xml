@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sspaceex xmlns="http://www-verimag.imag.fr/xml-namespaces/sspaceex" version="0.2" math="SpaceEx">
+  <component id="acc_system">
+    <!-- Global system parameters -->
+    <param name="v" type="real" local="false" d1="1" d2="1" dynamics="any" />
+    <param name="t" type="real" local="true" d1="1" d2="1" dynamics="any" />
+    <param name="d" type="real" local="true" d1="1" d2="1" dynamics="any" />
+    <param name="s" type="real" local="true" d1="1" d2="1" dynamics="any" /> <!-- Sensor reading -->
+
+    <!-- Locations represent different control modes -->
+    <location id="1" name="Normal" x="100" y="100" width="200" height="100">
+      <invariant>v &gt;= 20 and v &lt;= 30 and d &gt;= 10</invariant>
+      <flow>v' == -0.5*v + control; t' == 1; d' == 0.1; s' == 0</flow>
+    </location>
+
+    <location id="2" name="Decelerate" x="350" y="100" width="200" height="100">
+      <invariant>v &gt;= 10 and d &lt; 10</invariant>
+      <flow>v' == -1*v + control; t' == 1; d' == 0.2; s' == 0</flow>
+    </location>
+
+    <!-- A mode to capture sensor spoofing events -->
+    <location id="3" name="SensorSpoof" x="200" y="250" width="200" height="100">
+      <invariant>s &gt; d + 5</invariant>
+      <flow>v' == -0.2*v + control; t' == 1; s' == 0</flow>
+    </location>
+
+    <!-- Transitions implementing adaptive and recovery behavior -->
+    <transition source="1" target="2">
+      <guard>d &lt; 10</guard>
+      <assignment>t := 0</assignment>
+    </transition>
+    <transition source="2" target="1">
+      <guard>d &gt;= 10</guard>
+      <assignment>t := 0</assignment>
+    </transition>
+    <!-- Transition to sensor spoof mode when sensor reading deviates by more than 5 units from d -->
+    <transition source="1" target="3">
+      <guard>s &gt; d + 5</guard>
+      <assignment>s := d</assignment>
+    </transition>
+    <transition source="3" target="1">
+      <guard>s == d</guard>
+      <assignment>t := 0</assignment>
+    </transition>
+  </component>
+  
+  <component id="system">
+    <param name="v" type="real" local="false" d1="1" d2="1" dynamics="any" controlled="true" />
+    <bind component="acc_system" as="acc1">
+      <map key="v">v</map>
+    </bind>
+  </component>
+</sspaceex>
