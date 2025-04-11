@@ -1,0 +1,237 @@
+# Description to Build ACC_Model.slx in Simulink
+# Version: 1.0
+# Date: [Current Date]
+# Author: [Your Name/Group]
+#
+# Follow these instructions step-by-step in the Simulink environment
+# to create the ACC system model. Save the final model as ACC_Model.slx
+# in the same directory as the simulation_script.m file.
+
+# ==============================================================================
+# I. INPUTS & BASIC PARAMETERS (Source Blocks)
+# ==============================================================================
+# These blocks provide the basic setpoints and configuration values.
+
+1.  **Block:** `Constant`
+    *   **Library Location:** `Simulink -> Sources`
+    *   **Purpose:** Defines the driver's desired cruising speed when ACC is active and no lead vehicle is interfering.
+    *   **Parameter:** `Constant value`: `30` (Example: 30 m/s)
+    *   **Rename Block To:** `V_set_speed`
+
+2.  **Block:** `Constant`
+    *   **Library Location:** `Simulink -> Sources`
+    *   **Purpose:** Simulates the speed of the lead vehicle. In a real system, this would come from sensors.
+    *   **Parameter:** `Constant value`: `20` (Example: 20 m/s)
+    *   **Rename Block To:** `v_lead`
+
+3.  **Block:** `Constant`
+    *   **Library Location:** `Simulink -> Sources`
+    *   **Purpose:** Sets the initial distance between the ego vehicle and the lead vehicle at the start of the simulation.
+    *   **Parameter:** `Constant value`: `80` (Example: 80 meters)
+    *   **Rename Block To:** `d_rel_initial`
+
+4.  **Block:** `Constant`
+    *   **Library Location:** `Simulink -> Sources`
+    *   **Purpose:** Defines the desired time gap (in seconds) the ACC should maintain behind the lead vehicle.
+    *   **Parameter:** `Constant value`: `1.8` (Example: 1.8 seconds)
+    *   **Rename Block To:** `T_gap`
+
+5.  **Block:** `Constant`
+    *   **Library Location:** `Simulink -> Sources`
+    *   **Purpose:** Defines the absolute minimum distance cushion (in meters) the ACC should maintain, regardless of speed.
+    *   **Parameter:** `Constant value`: `5` (Example: 5 meters)
+    *   **Rename Block To:** `d_min`
+
+6.  **Block:** `Constant` (For Spoofing Simulation)
+    *   **Library Location:** `Simulink -> Sources`
+    *   **Purpose:** Introduces an artificial offset to the distance sensor reading to simulate an attack. 0 means no attack.
+    *   **Parameter:** `Constant value`: `0` (Change to non-zero, e.g., -20, to simulate attack)
+    *   **Rename Block To:** `spoofing_offset`
+    *   **Alternative:** For attacks starting during simulation, replace this with a `Step` block (`Simulink -> Sources`). Configure Step time and Initial/Final values.
+
+# ==============================================================================
+# II. VEHICLE DYNAMICS (Ego Vehicle Plant - Simplified Model)
+# ==============================================================================
+# This section models how the ego vehicle responds to acceleration commands.
+# Consider putting these blocks inside a Subsystem named 'Vehicle Dynamics Plant'.
+
+1.  **Block:** `Inport` (Input to the Subsystem/Section)
+    *   **Library Location:** `Simulink -> Ports & Subsystems`
+    *   **Purpose:** Represents the acceleration command coming FROM the controller.
+    *   **Rename Block To:** `Acc_Cmd` (or similar)
+
+2.  **Block:** `Saturation` (Acceleration Limits)
+    *   **Library Location:** `Simulink -> Discontinuities`
+    *   **Purpose:** Limits the commanded acceleration to realistic physical maximums for the vehicle.
+    *   **Parameter:** `Upper limit`: `2` (Example: max acceleration 2 m/s^2)
+    *   **Parameter:** `Lower limit`: `-5` (Example: max deceleration -5 m/s^2)
+    *   **Connection:** Connect `Acc_Cmd` (Inport) to the input of this `Saturation` block.
+    *   **Signal Name:** Name the signal line coming OUT of this block: `a_actual`
+
+3.  **Block:** `Integrator` (Calculate Velocity)
+    *   **Library Location:** `Simulink -> Continuous`
+    *   **Purpose:** Integrates acceleration over time to calculate the vehicle's speed.
+    *   **Parameter:** `Initial condition`: `0` (Or use a workspace variable like `v_ego_initial` defined in the MATLAB script)
+    *   **Connection:** Connect the `a_actual` signal line to the input of this `Integrator`.
+    *   **Signal Name:** Name the signal line coming OUT of this block: `v_ego`
+
+4.  **Block:** `Saturation` (Speed Limits)
+    *   **Library Location:** `Simulink -> Discontinuities`
+    *   **Purpose:** Limits the calculated speed to physical constraints (e.g., cannot go below 0, optional max speed).
+    *   **Parameter:** `Upper limit`: `40` (Example: max speed 40 m/s, can use a variable like `v_max_limit`)
+    *   **Parameter:** `Lower limit`: `0`
+    *   **Connection:** Connect the `v_ego` signal line (output of the previous Integrator) to the input of this `Saturation` block.
+    *   **Signal Name:** Name the signal line coming OUT of this block: `v_ego_limited` (This is the final, constrained ego speed)
+
+5.  **Block:** `Integrator` (Calculate Position)
+    *   **Library Location:** `Simulink -> Continuous`
+    *   **Purpose:** Integrates speed over time to calculate the vehicle's position (optional but needed for distance calculation).
+    *   **Parameter:** `Initial condition`: `0`
+    *   **Connection:** Connect the `v_ego_limited` signal line to the input of this `Integrator`.
+    *   **Signal Name:** Name the signal line coming OUT of this block: `pos_ego`
+
+6.  **Block:** `Outport` (Output from Subsystem/Section)
+    *   **Library Location:** `Simulink -> Ports & Subsystems`
+    *   **Purpose:** Makes the final calculated ego speed available to other parts of the model.
+    *   **Rename Block To:** `v_ego_out`
+    *   **Connection:** Connect the `v_ego_limited` signal line to this `Outport`.
+
+7.  **Block:** `Outport` (Output from Subsystem/Section)
+    *   **Library Location:** `Simulink -> Ports & Subsystems`
+    *   **Purpose:** Makes the calculated ego position available (optional).
+    *   **Rename Block To:** `pos_ego_out`
+    *   **Connection:** Connect the `pos_ego` signal line to this `Outport`.
+
+8.  **(Recommended) Create Subsystem:** Select all blocks in this section (II.1 to II.7). Right-click on the selection -> `Create Subsystem from Selection`. Rename the yellow subsystem block to `Vehicle Dynamics Plant`. The `Acc_Cmd` will become an input port, and `v_ego_out`, `pos_ego_out` will become output ports of this subsystem.
+
+# ==============================================================================
+# III. DISTANCE CALCULATION
+# ==============================================================================
+# Calculates the actual distance between the ego and lead vehicles.
+
+1.  **Block:** `Subtract` (Calculate Relative Speed)
+    *   **Library Location:** `Simulink -> Math Operations`
+    *   **Purpose:** Calculates the difference between lead vehicle speed and ego vehicle speed.
+    *   **Parameter:** `List of signs`: `+-` (Ensures calculation is v_lead - v_ego)
+    *   **Connection 1:** Connect the output of the `v_lead` block (from Section I) to the **TOP (+)** input port.
+    *   **Connection 2:** Connect the `v_ego_limited` signal (output from the `Vehicle Dynamics Plant` subsystem or block II.4) to the **BOTTOM (-)** input port. *Branch this signal if needed.*
+    *   **Signal Name:** Name the signal line coming OUT of this block: `v_rel`
+
+2.  **Block:** `Integrator` (Calculate Change in Distance)
+    *   **Library Location:** `Simulink -> Continuous`
+    *   **Purpose:** Integrates the relative speed to find the total change in distance since the simulation started.
+    *   **Parameter:** `Initial condition`: `0`
+    *   **Connection:** Connect the `v_rel` signal line to the input of this `Integrator`.
+    *   **Signal Name:** Name the signal line coming OUT of this block: `d_rel_change`
+
+3.  **Block:** `Add` (Calculate Current Distance)
+    *   **Library Location:** `Simulink -> Math Operations`
+    *   **Purpose:** Adds the initial separation distance to the calculated change in distance.
+    *   **Connection 1:** Connect the output of the `d_rel_initial` block (from Section I) to one input port.
+    *   **Connection 2:** Connect the `d_rel_change` signal line to the other input port.
+    *   **Signal Name:** Name the signal line coming OUT of this block: `d_rel` (This is the actual, instantaneous relative distance)
+
+# ==============================================================================
+# IV. SENSOR SPOOFING INJECTION
+# ==============================================================================
+# Modifies the actual distance to simulate a faulty/attacked sensor reading.
+
+1.  **Block:** `Add`
+    *   **Library Location:** `Simulink -> Math Operations`
+    *   **Purpose:** Adds the spoofing offset to the actual distance.
+    *   **Connection 1:** Connect the `d_rel` signal line (output from Section III) to one input port.
+    *   **Connection 2:** Connect the output of the `spoofing_offset` block (from Section I) to the other input port.
+    *   **Signal Name:** Name the signal line coming OUT of this block: `d_sensed` (This is the distance the ACC controller *perceives*)
+
+# ==============================================================================
+# V. ADAPTIVE LOGIC (Determining Target Speed)
+# ==============================================================================
+# Calculates the safe following distance and selects the appropriate target speed.
+
+1.  **Block:** `Product` (Time Gap Distance Component)
+    *   **Library Location:** `Simulink -> Math Operations`
+    *   **Purpose:** Calculates the variable part of the safe distance (Time Gap * Ego Speed).
+    *   **Connection 1:** Connect the output of the `T_gap` block (from Section I) to one input port.
+    *   **Connection 2:** Connect the `v_ego_limited` signal (output from `Vehicle Dynamics Plant`) to the other input port. *Branch this signal if needed.*
+
+2.  **Block:** `Add` (Calculate Safe Distance)
+    *   **Library Location:** `Simulink -> Math Operations`
+    *   **Purpose:** Adds the minimum distance cushion to the time-gap component.
+    *   **Connection 1:** Connect the output of the `d_min` block (from Section I) to one input port.
+    *   **Connection 2:** Connect the output signal line of the `Product` block (from V.1) to the other input port.
+    *   **Signal Name:** Name the signal line coming OUT of this block: `d_safe`
+
+3.  **Block:** `Relational Operator` (Compare Sensed vs Safe Distance)
+    *   **Library Location:** `Simulink -> Logic and Bit Operations`
+    *   **Purpose:** Checks if the perceived distance is greater than or equal to the calculated safe distance.
+    *   **Parameter:** `Operator`: `>=`
+    *   **Connection 1:** Connect the `d_sensed` signal line (from Section IV) to the **TOP** input port.
+    *   **Connection 2:** Connect the `d_safe` signal line (from V.2) to the **BOTTOM** input port.
+    *   **Output:** This block outputs `1` (true) if `d_sensed >= d_safe`, and `0` (false) otherwise.
+
+4.  **Block:** `Switch` (Select Target Speed)
+    *   **Library Location:** `Simulink -> Signal Routing`
+    *   **Purpose:** Selects the target speed based on the comparison result. If distance is safe (input 2 is non-zero), use set speed (input 1). If distance is unsafe (input 2 is zero), use lead speed (input 3).
+    *   **Connection 1 (Top Input - u1):** Connect the output of the `V_set_speed` block (from Section I). *Branch this signal.*
+    *   **Connection 2 (Middle Input - u2, Control):** Connect the output signal line of the `Relational Operator` block (from V.3).
+    *   **Connection 3 (Bottom Input - u3):** Connect the output of the `v_lead` block (from Section I). *Branch this signal.*
+    *   **Signal Name:** Name the signal line coming OUT of this block: `v_target`
+
+# ==============================================================================
+# VI. SPEED CONTROLLER (PID Implementation)
+# ==============================================================================
+# Calculates the required acceleration command based on the speed error.
+
+1.  **Block:** `Subtract` (Calculate Speed Error)
+    *   **Library Location:** `Simulink -> Math Operations`
+    *   **Purpose:** Calculates the difference between the target speed and the actual ego speed.
+    *   **Parameter:** `List of signs`: `+-` (Ensures calculation is v_target - v_ego)
+    *   **Connection 1:** Connect the `v_target` signal line (from Section V) to the **TOP (+)** input port.
+    *   **Connection 2:** Connect the `v_ego_limited` signal (output from `Vehicle Dynamics Plant`) to the **BOTTOM (-)** input port. *Branch this signal if needed.*
+    *   **Signal Name:** Name the signal line coming OUT of this block: `speed_error`
+
+2.  **Block:** `PID Controller`
+    *   **Library Location:** `Simulink -> Continuous` (or potentially `Controller Library` if toolboxes installed)
+    *   **Purpose:** Computes the control action (acceleration command) to minimize the speed error.
+    *   **Parameters (CRITICAL - NEED TUNING):**
+        *   Select `Controller form`: `Parallel` or `Ideal` (be consistent).
+        *   Set `Proportional (P)`: e.g., `800` (Use variable like `Kp` from MATLAB workspace if preferred).
+        *   Set `Integral (I)`: e.g., `40` (Use variable like `Ki`).
+        *   Set `Derivative (D)`: e.g., `150` (Use variable like `Kd`).
+        *   *Filter coefficient (N)*: May need adjustment (e.g., 100).
+        *   Go to the `Output Saturation` tab within the block parameters.
+        *   Enable `Limit output`.
+        *   Set `Upper saturation limit`: `2` (Match `a_max` from block II.2).
+        *   Set `Lower saturation limit`: `-5` (Match `a_min` from block II.2).
+    *   **Connection:** Connect the `speed_error` signal line to the input port of the `PID Controller`.
+    *   **Signal Name:** Name the signal line coming OUT of this block: `Acc_Cmd_raw`
+
+3.  **Connect Controller Output to Plant:**
+    *   Connect the `Acc_Cmd_raw` signal line (output of PID) to the input port (`Acc_Cmd`) of the `Vehicle Dynamics Plant` subsystem (or block II.1 if not using a subsystem).
+
+# ==============================================================================
+# VII. VISUALIZATION (Scopes)
+# ==============================================================================
+# Allows viewing simulation results graphically.
+
+1.  **Block:** `Scope`
+    *   **Library Location:** `Simulink -> Sinks`
+    *   **Purpose:** Displays plots of connected signals over time.
+    *   **Connections:** Connect the following signals to the Scope's input port(s). Use branching as needed. Consider using a `Mux` block (`Signal Routing`) to combine signals before connecting to the Scope for neatness.
+        *   `v_ego_limited` (Actual Ego Speed)
+        *   `v_target` (Target Speed)
+        *   `v_lead` (Lead Vehicle Speed)
+        *   `d_rel` (Actual Distance)
+        *   `d_sensed` (Sensed Distance)
+        *   `d_safe` (Calculated Safe Distance)
+        *   `a_actual` (Actual Ego Acceleration) or `Acc_Cmd_raw`
+    *   **Configuration:** After running simulation, double-click Scope, use `View -> Layout` to add multiple plots, and `Simulation -> Signals & Triggering` to drag signals to desired plots. Use `View -> Legend`.
+
+# ==============================================================================
+# FINAL STEPS
+# ==============================================================================
+1.  Review all connections and block parameters.
+2.  Ensure consistent units (mostly meters and seconds).
+3.  Consider using subsystems for organization (Sections II, III+IV, V).
+4.  Save the model as `ACC_Model.slx` in the project directory.
+5.  Run the `simulation_script.m` in MATLAB to simulate. Tuning PID gains and other parameters in the script or model will be necessary.
